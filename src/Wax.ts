@@ -17,7 +17,7 @@ import { WaxIcon } from "./WaxIcon";
 import { UALWaxError } from "./UALWaxError";
 
 import { Api, JsonRpc } from "eosjs";
-// import fetch from "node-fetch";
+import fetch from "node-fetch";
 import { JsSignatureProvider } from "eosjs/dist/eosjs-jssig";
 
 //const LIMITLESS_WAX_PUBLIC_KEY: string = "PUB_K1_7FUX7yAxiff74N2GEgainGr5jYnKmeY2NjXagLMsyFbNX9Hkup";
@@ -318,7 +318,9 @@ export class Wax extends Authenticator {
 
       const chainId =
         "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4";
+
       const sTranaction = data.serializedTransaction;
+
       const deserializedTransaction = await api.deserializeTransaction(
         sTranaction
       );

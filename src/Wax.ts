@@ -5,20 +5,23 @@ import {
   UALError,
 } from "universal-authenticator-library";
 import { UALErrorType } from "universal-authenticator-library/dist";
-import { SignatureProvider } from "eosjs/dist/eosjs-api-interfaces";
+import {
+  SignatureProvider,
+  SignatureProviderArgs,
+} from "eosjs/dist/eosjs-api-interfaces";
 import { WaxJS } from "@waxio/waxjs/dist";
+import { PushTransactionArgs } from "eosjs/dist/eosjs-rpc-interfaces";
 
 import { WaxUser } from "./WaxUser";
 import { WaxIcon } from "./WaxIcon";
 import { UALWaxError } from "./UALWaxError";
 
 import { Api, JsonRpc } from "eosjs";
-import fetch from "node-fetch";
+// import fetch from "node-fetch";
 import { JsSignatureProvider } from "eosjs/dist/eosjs-jssig";
 
-const signatureProvider = new JsSignatureProvider([
-  "5KfNZXk82jua4CEnir7KRC4eyG8VaGzgfu6myXRnLLL6mjjsESj",
-]);
+//const LIMITLESS_WAX_PUBLIC_KEY: string = "PUB_K1_7FUX7yAxiff74N2GEgainGr5jYnKmeY2NjXagLMsyFbNX9Hkup";
+//const LIMITLESS_WAX_BACKEND_URL: string = "api.limitlesswax.co";
 
 export class Wax extends Authenticator {
   private wax?: WaxJS;
@@ -26,10 +29,8 @@ export class Wax extends Authenticator {
 
   private initiated = false;
 
-  private session?: { userAccount: string; pubKeys: string[]; isTemp: boolean };
+  private session?: { userAccount: string; pubKeys: string[] };
 
-  private readonly apiSigner?: SignatureProvider;
-  private readonly returnTempAccounts: boolean | undefined;
   private readonly waxSigningURL: string | undefined;
   private readonly waxAutoSigningURL: string | undefined;
 
@@ -37,16 +38,12 @@ export class Wax extends Authenticator {
     chains: Chain[],
     options?: {
       apiSigner?: SignatureProvider;
-      returnTempAccounts?: boolean | undefined;
       waxSigningURL?: string | undefined;
       waxAutoSigningURL?: string | undefined;
     }
   ) {
     super(chains, options);
 
-    this.apiSigner = options && options.apiSigner;
-
-    this.returnTempAccounts = options && options.returnTempAccounts;
     this.waxSigningURL = options && options.waxSigningURL;
     this.waxAutoSigningURL = options && options.waxAutoSigningURL;
   }
@@ -67,11 +64,7 @@ export class Wax extends Authenticator {
           );
 
           if (data && data.expire >= Date.now()) {
-            this.receiveLogin(
-              data.userAccount,
-              data.pubKeys,
-              data?.isTemp || false
-            );
+            this.receiveLogin(data.userAccount, data.pubKeys);
           }
         }
       }
@@ -175,6 +168,7 @@ export class Wax extends Authenticator {
    */
   async login(): Promise<User[]> {
     console.log(`UAL-WAX: login requested`);
+    console.log(this.apiSigner);
 
     // Commented for now to support multiple wax chains such as testnets/staging in the future
     // Mainnet check:  this.chains[0].chainId !== '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'
@@ -209,7 +203,7 @@ export class Wax extends Authenticator {
           this.chains[0],
           this.session.userAccount,
           this.session.pubKeys,
-          this.session.isTemp,
+          false,
           this.wax
         ),
       ];
@@ -253,11 +247,7 @@ export class Wax extends Authenticator {
     return "wax";
   }
 
-  private receiveLogin(
-    userAccount?: string,
-    pubKeys?: string[],
-    isTemp?: boolean
-  ) {
+  private receiveLogin(userAccount?: string, pubKeys?: string[]) {
     if (!this.wax) {
       return;
     }
@@ -267,8 +257,6 @@ export class Wax extends Authenticator {
       userAccount: userAccount || this.wax.userAccount,
       // @ts-ignore
       pubKeys: pubKeys || this.wax.pubKeys,
-      // @ts-ignore
-      isTemp: isTemp || this.wax.isTemp || false,
       expire: Date.now() + this.shouldInvalidateAfter() * 1000,
     };
 
@@ -281,11 +269,11 @@ export class Wax extends Authenticator {
   }
 
   private initWaxJS() {
+    console.log(this.apiSigner);
     this.wax = new WaxJS({
       rpcEndpoint: this.getEndpoint(),
       tryAutoLogin: false,
       apiSigner: this.apiSigner,
-      returnTempAccounts: this.returnTempAccounts || false,
       waxSigningURL: this.waxSigningURL,
       waxAutoSigningURL: this.waxAutoSigningURL,
     });
@@ -311,22 +299,24 @@ export class Wax extends Authenticator {
           serializedTransaction: data.serializedTransaction,
         };
       }
-
-      // const request = {
-      //     transaction: Array.from(data.serializedTransaction),
-      // };
-
+      const httpEndpoint = "https://api.waxsweden.org";
       const rpc = new JsonRpc(httpEndpoint, {
         fetch,
       });
+
+      const signatureProvider = new JsSignatureProvider([
+        "5KfNZXk82jua4CEnir7KRC4eyG8VaGzgfu6myXRnLLL6mjjsESj",
+      ]);
 
       // Establish the API alongwith the rpc and signature provider
       const api = new Api({
         rpc,
         signatureProvider,
+        textDecoder: new TextDecoder(),
+        textEncoder: new TextEncoder(),
       });
 
-      const chainid =
+      const chainId =
         "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4";
       const sTranaction = data.serializedTransaction;
       const deserializedTransaction = await api.deserializeTransaction(
@@ -334,10 +324,10 @@ export class Wax extends Authenticator {
       );
       const abis = await api.getTransactionAbis(deserializedTransaction);
       const serializedContextFreeData = await api.serializeContextFreeData(
-        deserializedTransaction.context_free_data
+        deserializedTransaction.context_free_data!
       );
       const signedTransaction = await api.signatureProvider.sign({
-        chainid,
+        chainId,
         requiredKeys: [
           "PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs",
         ],
@@ -345,17 +335,6 @@ export class Wax extends Authenticator {
         serializedContextFreeData,
         abis,
       });
-
-      // const deserializedTransaction = await api.deserializeTransaction(data.serializedTransaction);
-      // const abis = await api.getTransactionAbis(deserializedTransaction);
-      // const serializedContextFreeData = await api.serializeContextFreeData(deserializedTransaction.context_free_data);
-      // const signedTransaction = await api.signatureProvider.sign({
-      //             this.chains[0].chainId,
-      //             requiredKeys: ["PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs"],
-      //             data.serializedTransaction,
-      //             serializedContextFreeData,
-      //             abis,
-      // });
 
       const output = {
         signatures: signedTransaction.signatures,

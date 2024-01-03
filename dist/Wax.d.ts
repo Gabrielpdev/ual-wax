@@ -5,12 +5,10 @@ export declare class Wax extends Authenticator {
     private users;
     private initiated;
     private session?;
-    private readonly returnTempAccounts;
     private readonly waxSigningURL;
     private readonly waxAutoSigningURL;
     constructor(chains: Chain[], options?: {
         apiSigner?: SignatureProvider;
-        returnTempAccounts?: boolean | undefined;
         waxSigningURL?: string | undefined;
         waxAutoSigningURL?: string | undefined;
     });

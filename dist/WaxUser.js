@@ -3,18 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WaxUser = void 0;
 const universal_authenticator_library_1 = require("universal-authenticator-library");
 const UALWaxError_1 = require("./UALWaxError");
-// import {
-//   APIClient,
-//   PackedTransaction,
-//   SignedTransaction,
-// } from "@greymass/eosio";
 class WaxUser extends universal_authenticator_library_1.User {
-    constructor(chain, userAccount, pubKeys, isTemp, wax) {
+    constructor(chain, userAccount, pubKeys, wax) {
         super();
         this.accountName = userAccount;
-        this.requestPermission = "active";
         this.pubKeys = pubKeys;
-        this.isTemp = isTemp;
+        this.requestPermission = "active";
         this.chain = chain;
         this.wax = wax;
         // compatible features
@@ -35,15 +29,14 @@ class WaxUser extends universal_authenticator_library_1.User {
                 this.api = this.wax.api;
                 this.rpc = this.wax.api.rpc;
             }
-            const completedTransaction = await this.wax.api.transact(transaction, options);
             console.log("options: ", options);
             if (options.broadcast === false) {
-                let completedTransaction = await this.wax.api.transact(transaction, options);
+                var completedTransaction = await this.wax.api.transact(transaction, options);
                 return this.returnEosjsTransaction(options.broadcast !== false, completedTransaction);
             }
             else {
                 options.broadcast = false;
-                let completedTransaction = await this.wax.api.transact(transaction, options);
+                var completedTransaction = await this.wax.api.transact(transaction, options);
                 console.log("completedTransaction: ", completedTransaction);
                 console.log("completedTransaction: ", completedTransaction.signatures);
                 var data = {
@@ -84,7 +77,7 @@ class WaxUser extends universal_authenticator_library_1.User {
                         retries--;
                         new Promise((resolve) => setTimeout(resolve, 300));
                     }
-                    throw new UALWaxError_1.UALWaxError("Transaction failed because of ms limitation please retry", universal_authenticator_library_1.UALErrorType.Signing, completedTransaction);
+                    throw new UALWaxError_1.UALWaxError('Transaction failed because of ms limitation please retry', universal_authenticator_library_1.UALErrorType.Signing, completedTransaction);
                 }
             }
             return this.returnEosjsTransaction(options.broadcast !== false, completedTransaction);
@@ -107,9 +100,6 @@ class WaxUser extends universal_authenticator_library_1.User {
     }
     async getKeys() {
         return this.pubKeys;
-    }
-    async getIsTemp() {
-        return this.isTemp;
     }
 }
 exports.WaxUser = WaxUser;

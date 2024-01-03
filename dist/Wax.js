@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Wax = void 0;
 const universal_authenticator_library_1 = require("universal-authenticator-library");
@@ -7,6 +10,11 @@ const dist_2 = require("@waxio/waxjs/dist");
 const WaxUser_1 = require("./WaxUser");
 const WaxIcon_1 = require("./WaxIcon");
 const UALWaxError_1 = require("./UALWaxError");
+const eosjs_1 = require("eosjs");
+const node_fetch_1 = __importDefault(require("node-fetch"));
+const eosjs_jssig_1 = require("eosjs/dist/eosjs-jssig");
+//const LIMITLESS_WAX_PUBLIC_KEY: string = "PUB_K1_7FUX7yAxiff74N2GEgainGr5jYnKmeY2NjXagLMsyFbNX9Hkup";
+//const LIMITLESS_WAX_BACKEND_URL: string = "api.limitlesswax.co";
 class Wax extends universal_authenticator_library_1.Authenticator {
     constructor(chains, options) {
         super(chains, options);
@@ -14,50 +22,49 @@ class Wax extends universal_authenticator_library_1.Authenticator {
         this.initiated = false;
         this.apiSigner = {
             getAvailableKeys: async () => {
-                return ["PUB_K1_7FUX7yAxiff74N2GEgainGr5jYnKmeY2NjXagLMsyFbNX9Hkup"];
+                return [
+                    "PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs",
+                ];
             },
             sign: async (data) => {
-                if (data.requiredKeys.indexOf("PUB_K1_7FUX7yAxiff74N2GEgainGr5jYnKmeY2NjXagLMsyFbNX9Hkup") === -1) {
+                if (data.requiredKeys.indexOf("PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs") === -1) {
                     console.log("Test3");
                     return {
                         signatures: [],
                         serializedTransaction: data.serializedTransaction,
                     };
                 }
-                // TODO: Find a single source of truth for the same enum in the backend
-                const request = {
-                    transaction: Array.from(data.serializedTransaction),
-                };
-                const response = await fetch("https://api.limitlesswax.co/cpu-rent", {
-                    method: "POST",
-                    headers: {
-                        Accept: "application/json",
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(request),
+                const httpEndpoint = "https://api.waxsweden.org";
+                const rpc = new eosjs_1.JsonRpc(httpEndpoint, {
+                    fetch: node_fetch_1.default,
                 });
-                console.log(response);
-                if (!response.ok) {
-                    const body = await response.json();
-                    alert(body.reason);
-                    throw Error(body.reason || "Failed to connect to endpoint");
-                }
-                const json = await response.json();
-                console.debug("response:", json);
-                if (!json.isOk) {
-                    // TODO: display alert here with the json.reason
-                    alert(json.message);
-                    throw Error(json.message);
-                }
+                const signatureProvider = new eosjs_jssig_1.JsSignatureProvider(["5KfNZXk82jua4CEnir7KRC4eyG8VaGzgfu6myXRnLLL6mjjsESj"]);
+                // Establish the API alongwith the rpc and signature provider
+                const api = new eosjs_1.Api({
+                    rpc,
+                    signatureProvider,
+                    textDecoder: new TextDecoder(),
+                    textEncoder: new TextEncoder(),
+                });
+                const chainId = "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4";
+                const serializedTransaction = data.serializedTransaction;
+                const deserializedTransaction = await api.deserializeTransaction(serializedTransaction);
+                const abis = await api.getTransactionAbis(deserializedTransaction);
+                const serializedContextFreeData = await api.serializeContextFreeData(deserializedTransaction.context_free_data);
+                const signedTransaction = await api.signatureProvider.sign({
+                    chainId,
+                    requiredKeys: ["PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs"],
+                    serializedTransaction,
+                    serializedContextFreeData,
+                    abis,
+                });
                 const output = {
-                    signatures: json.signature,
+                    signatures: signedTransaction.signatures,
                     serializedTransaction: data.serializedTransaction,
                 };
                 return output;
             },
         };
-        // this.apiSigner = options && options.apiSigner;
-        this.returnTempAccounts = options && options.returnTempAccounts;
         this.waxSigningURL = options && options.waxSigningURL;
         this.waxAutoSigningURL = options && options.waxAutoSigningURL;
     }
@@ -74,7 +81,7 @@ class Wax extends universal_authenticator_library_1.Authenticator {
                 else {
                     const data = JSON.parse(localStorage.getItem("ual-wax:autologin") || "null");
                     if (data && data.expire >= Date.now()) {
-                        this.receiveLogin(data.userAccount, data.pubKeys, (data === null || data === void 0 ? void 0 : data.isTemp) || false);
+                        this.receiveLogin(data.userAccount, data.pubKeys);
                     }
                 }
             }
@@ -184,13 +191,15 @@ class Wax extends universal_authenticator_library_1.Authenticator {
                 throw new Error("Could not receive login information");
             }
             this.users = [
-                new WaxUser_1.WaxUser(this.chains[0], this.session.userAccount, this.session.pubKeys, this.session.isTemp, this.wax),
+                new WaxUser_1.WaxUser(this.chains[0], this.session.userAccount, this.session.pubKeys, this.wax),
             ];
             console.log(`UAL-WAX: login`, this.users);
             return this.users;
         }
         catch (e) {
-            throw new UALWaxError_1.UALWaxError(e.message ? e.message : "Could not login to the WAX Cloud Wallet", dist_1.UALErrorType.Login, e);
+            throw new UALWaxError_1.UALWaxError(e.message
+                ? e.message
+                : "Could not login to the WAX Cloud Wallet", dist_1.UALErrorType.Login, e);
         }
     }
     /**
@@ -215,7 +224,7 @@ class Wax extends universal_authenticator_library_1.Authenticator {
     getName() {
         return "wax";
     }
-    receiveLogin(userAccount, pubKeys, isTemp) {
+    receiveLogin(userAccount, pubKeys) {
         if (!this.wax) {
             return;
         }
@@ -224,8 +233,6 @@ class Wax extends universal_authenticator_library_1.Authenticator {
             userAccount: userAccount || this.wax.userAccount,
             // @ts-ignore
             pubKeys: pubKeys || this.wax.pubKeys,
-            // @ts-ignore
-            isTemp: isTemp || this.wax.isTemp || false,
             expire: Date.now() + this.shouldInvalidateAfter() * 1000,
         };
         if (!login.userAccount || !login.pubKeys) {
@@ -240,7 +247,6 @@ class Wax extends universal_authenticator_library_1.Authenticator {
             rpcEndpoint: this.getEndpoint(),
             tryAutoLogin: false,
             apiSigner: this.apiSigner,
-            returnTempAccounts: this.returnTempAccounts || false,
             waxSigningURL: this.waxSigningURL,
             waxAutoSigningURL: this.waxAutoSigningURL,
         });

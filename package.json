@@ -1,23 +1,20 @@
 {
-  "name": "@eosdacio/ual-wax",
-  "version": "1.9.0",
-  "description": "",
+  "name": "@deraxyna/ual-wax",
+  "version": "1.6.0",
+  "description": "UAL authenticator for WAX Cloud Wallet.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --build tsconfig.json",
     "lint": "tslint -p tsconfig.json"
   },
   "license": "MIT",
-  "author": {
-    "name": "eosDAC",
-    "url": "https://eosdac.io/"
-  },
+  "author": "deraXyna (limitlesswax.co)",
   "dependencies": {
     "@greymass/eosio": "^0.5.5",
     "@types/bn.js": "^5.1.0",
     "@types/elliptic": "^6.4.18",
     "@types/node-fetch": "^2.6.9",
-    "@waxio/waxjs": "^1.3.0",
+    "@waxio/waxjs": "^1.0.4",
     "eosjs": "^22.1.0",
     "universal-authenticator-library": "^0.3.0"
   },

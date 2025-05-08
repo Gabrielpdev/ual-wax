@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import {
   Chain,
   SignTransactionResponse,
@@ -7,18 +9,11 @@ import {
 import { WaxJS } from "@waxio/waxjs/dist";
 import { UALWaxError } from "./UALWaxError";
 
-// import {
-//   APIClient,
-//   PackedTransaction,
-//   SignedTransaction,
-// } from "@greymass/eosio";
-
 export class WaxUser extends User {
   public readonly accountName: string;
   public readonly requestPermission: string;
 
   private readonly pubKeys: string[];
-  private readonly isTemp: boolean;
   private readonly wax: WaxJS;
   private readonly chain: Chain;
 
@@ -29,15 +24,13 @@ export class WaxUser extends User {
     chain: Chain,
     userAccount: string,
     pubKeys: string[],
-    isTemp: boolean,
     wax: WaxJS
   ) {
     super();
 
     this.accountName = userAccount;
-    this.requestPermission = "active";
     this.pubKeys = pubKeys;
-    this.isTemp = isTemp;
+    this.requestPermission = "active";
 
     this.chain = chain;
     this.wax = wax;
@@ -65,15 +58,14 @@ export class WaxUser extends User {
         this.rpc = this.wax.api.rpc;
       }
 
-      const completedTransaction = await this.wax.api.transact(
-        transaction,
-        options
-      );
+      console.log("transaction", transaction);
 
+      options.broadcast = false;
+      console.log("broadcast", options.broadcast);
       console.log("options: ", options);
 
       if (options.broadcast === false) {
-        let completedTransaction: any = await this.wax.api.transact(
+        var completedTransaction: any = await this.wax.api.transact(
           transaction,
           options
         );
@@ -82,65 +74,28 @@ export class WaxUser extends User {
           completedTransaction
         );
       } else {
-        options.broadcast = false;
-        let completedTransaction: any = await this.wax.api.transact(
-          transaction,
-          options
-        );
-        console.log("completedTransaction: ", completedTransaction);
-        console.log("completedTransaction: ", completedTransaction.signatures);
-
-        var data = {
-          signatures: completedTransaction.signatures,
-          compression: 0,
-          serializedContextFreeData: undefined,
-          serializedTransaction: completedTransaction.serializedTransaction,
-        };
-
-        console.log("Data: ", data);
-
-        var retries = 3;
-        var retry = false;
         try {
-          completedTransaction = await this.wax.api.rpc.send_transaction(data);
+          console.log("wax", this.wax);
+          var completedTransaction: any = await this.wax.api.transact(
+            transaction,
+            options
+          );
+
           console.log("completed: ", completedTransaction);
           return this.returnEosjsTransaction(true, completedTransaction);
-        } catch (e) {
+        } catch (e: any) {
           const message = "api.rpc.send_transaction FAILED";
           console.log("Error: ", message);
-          retry = true;
-        }
-        if (retry) {
-          var res: any = {};
-          var completed = false;
-          while (retries > 0) {
-            try {
-              res = await this.wax.api.rpc.send_transaction(data);
-              completed = true;
-              console.log(res);
-            } catch (e) {
-              console.log(JSON.stringify(e));
-            }
-            // check for completed - need to check actual returned messages
-            if (completed) {
-              return this.returnEosjsTransaction(true, res);
-            }
-            retries--;
-            new Promise((resolve) => setTimeout(resolve, 300));
-          }
+          console.log("ErrorBlockChain: ", { e });
+
           throw new UALWaxError(
-            "Transaction failed because of ms limitation please retry",
+            e.message ? e.message : "Unable to sign transaction",
             UALErrorType.Signing,
-            completedTransaction
+            e
           );
         }
       }
-
-      return this.returnEosjsTransaction(
-        options.broadcast !== false,
-        completedTransaction
-      );
-    } catch (e) {
+    } catch (e: any) {
       throw new UALWaxError(
         e.message ? e.message : "Unable to sign transaction",
         UALErrorType.Signing,
@@ -175,9 +130,5 @@ export class WaxUser extends User {
 
   async getKeys() {
     return this.pubKeys;
-  }
-
-  async getIsTemp() {
-    return this.isTemp;
   }
 }

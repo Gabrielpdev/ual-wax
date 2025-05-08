@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import {
   Authenticator,
   Chain,
@@ -17,7 +19,7 @@ import { WaxIcon } from "./WaxIcon";
 import { UALWaxError } from "./UALWaxError";
 
 import { Api, JsonRpc } from "eosjs";
-import fetch from "node-fetch";
+// import fetch from "node-fetch";
 import { JsSignatureProvider } from "eosjs/dist/eosjs-jssig";
 
 //const LIMITLESS_WAX_PUBLIC_KEY: string = "PUB_K1_7FUX7yAxiff74N2GEgainGr5jYnKmeY2NjXagLMsyFbNX9Hkup";
@@ -40,6 +42,7 @@ export class Wax extends Authenticator {
       apiSigner?: SignatureProvider;
       waxSigningURL?: string | undefined;
       waxAutoSigningURL?: string | undefined;
+      appName?: string;
     }
   ) {
     super(chains, options);
@@ -203,7 +206,6 @@ export class Wax extends Authenticator {
           this.chains[0],
           this.session.userAccount,
           this.session.pubKeys,
-          false,
           this.wax
         ),
       ];
@@ -211,7 +213,7 @@ export class Wax extends Authenticator {
       console.log(`UAL-WAX: login`, this.users);
 
       return this.users;
-    } catch (e) {
+    } catch (e: any) {
       throw new UALWaxError(
         e.message ? e.message : "Could not login to the WAX Cloud Wallet",
         UALErrorType.Login,
@@ -253,9 +255,7 @@ export class Wax extends Authenticator {
     }
 
     const login = {
-      // @ts-ignore
       userAccount: userAccount || this.wax.userAccount,
-      // @ts-ignore
       pubKeys: pubKeys || this.wax.pubKeys,
       expire: Date.now() + this.shouldInvalidateAfter() * 1000,
     };
@@ -288,6 +288,8 @@ export class Wax extends Authenticator {
       return ["PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs"];
     },
     sign: async (data: SignatureProviderArgs): Promise<PushTransactionArgs> => {
+      console.log("sign Data", data);
+
       if (
         data.requiredKeys.indexOf(
           "PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs"
@@ -299,7 +301,9 @@ export class Wax extends Authenticator {
           serializedTransaction: data.serializedTransaction,
         };
       }
-      const httpEndpoint = "https://api.waxsweden.org";
+      const httpEndpoint =
+        `${this.chains[0].rpcEndpoints[0].protocol}://${this.chains[0].rpcEndpoints[0].host}` ||
+        "https://api.waxsweden.org";
       const rpc = new JsonRpc(httpEndpoint, {
         fetch,
       });
@@ -315,28 +319,40 @@ export class Wax extends Authenticator {
         textDecoder: new TextDecoder(),
         textEncoder: new TextEncoder(),
       });
+      console.log("api", api);
 
       const chainId =
         "1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4";
-
-      const sTranaction = data.serializedTransaction;
-
+      const serializedTransaction = data.serializedTransaction;
       const deserializedTransaction = await api.deserializeTransaction(
-        sTranaction
+        serializedTransaction
       );
       const abis = await api.getTransactionAbis(deserializedTransaction);
       const serializedContextFreeData = await api.serializeContextFreeData(
         deserializedTransaction.context_free_data!
       );
+
+      console.log("signatureProvider.sign", {
+        chainId,
+        requiredKeys: [
+          "PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs",
+        ],
+        serializedTransaction,
+        serializedContextFreeData,
+        abis,
+      });
+
       const signedTransaction = await api.signatureProvider.sign({
         chainId,
         requiredKeys: [
           "PUB_K1_79ZwLUGvWUxUiKbm2ucZFURrqZQXkzbgoAzp3uVWp94mcDiLRs",
         ],
-        sTranaction,
+        serializedTransaction,
         serializedContextFreeData,
         abis,
       });
+
+      console.log("signedTransaction", signedTransaction);
 
       const output = {
         signatures: signedTransaction.signatures,
